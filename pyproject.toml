@@ -10,7 +10,7 @@ authors = [
 ]
 description = "Finding and running ArcGIS Business Analyst Infographics using Python."
 readme = "README.md"
-requires-python = ">=3.6, <=3.12"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
@@ -18,9 +18,7 @@ classifiers = [
 license = {file = "LICENSE"}
 dependencies = [
     "arcgis>=2.2.0",
-    "numpy>=1.7",
     "pandas>=1.0.5",
-    "pyarrow>=1.0.0"
 ]
 
 [tool.setuptools.packages.find]

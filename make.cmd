@@ -37,8 +37,8 @@ SET CONDA_DIR="%~dp0env"
 GOTO %1
 
 :: Perform data preprocessing steps contained in the make_data.py script.
-:data
-    CALL conda run -p %CONDA_DIR% python scripts/make_data.py
+:infographics
+    CALL conda run -p %CONDA_DIR% python scripts/make_infographics.py
     GOTO end
 
 :: Make documentation using Sphinx!
@@ -63,20 +63,10 @@ GOTO %1
 
     GOTO end
 
-:: Remove the environment
-:remove_env
-    CALL conda deactivate
-    CALL conda env remove -p %CONDA_DIR% -y
-	GOTO end
-
 :: Start Jupyter Label
 :jupyter
     CALL conda run -p %CONDA_DIR% python -m jupyterlab --ip=0.0.0.0 --allow-root --NotebookApp.token=""
     GOTO end
-
-:: Make *.pyt zipped archive with requirements
-:pyt_pkg
-    CALL conda run -p %CONDA_DIR% python -m scripts/make_pyt_archive.py
 
 :: Make the package for uploading
 :wheel
