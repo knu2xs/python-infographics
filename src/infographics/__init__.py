@@ -203,7 +203,7 @@ def get_organization_infographics(gis: Optional[GIS]) -> pd.DataFrame:
 def create_infographic(
     study_areas: Union[Geometry, list[Geometry]],
     gis: GIS,
-    report: str,
+    infographic_id: str,
     out_path: Union[str, Path],
     export_format: str = "pdf",
 ):
@@ -215,7 +215,7 @@ def create_infographic(
     Args:
         study_areas: Either a single Geometry or list of Geometry objects.
         gis: Required instantiated GIS object instance.
-        report: Web GIS Item id or ReportID for one of the standard Infographics.
+        infographic_id: Web GIS Item id or ReportID for one of the standard Infographics.
         out_path: Path to where the output file will be saved.
         export_format: String for desired output format. Default is 'pdf'.
 
@@ -247,7 +247,7 @@ def create_infographic(
     # get the report
     out_report = create_report(
         study_areas=in_geom,
-        report=report,
+        report=infographic_id,
         export_format=export_format,
         out_folder=out_folder,
         out_name=out_name,
