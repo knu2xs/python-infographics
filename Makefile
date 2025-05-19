@@ -5,7 +5,7 @@
 #################################################################################
 
 PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-PROJECT_NAME = infographics
+PROJECT_NAME = python-infographics
 ENV = $(PROJECT_DIR)/env
 
 #################################################################################

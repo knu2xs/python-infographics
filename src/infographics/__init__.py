@@ -2,99 +2,256 @@ __title__ = "infographics"
 __version__ = "0.0.0"
 __author__ = "Joel McCune (https://github.com/knu2xs)"
 __license__ = "Apache 2.0"
-__copyright__ = "Copyright 2023 by Joel McCune (https://github.com/knu2xs)"
+__copyright__ = "Copyright 2025 by Joel McCune (https://github.com/knu2xs)"
 
-__all__ = ["example_function", "ExampleObject", "utils"]
+__all__ = [
+    "get_standard_infographics",
+    "get_organization_infographics",
+    "create_infographic",
+]
 
-from typing import Union
+from functools import cache
+import json
 from pathlib import Path
+from typing import Optional, Union
 
+from arcgis.env import active_gis
+from arcgis.geometry import Geometry
+from arcgis.geoenrichment import create_report
+from arcgis.gis import GIS
 import pandas as pd
 
-# add specific imports below if you want to organize your code into modules, which is mostly what I do
-from . import utils
+
+def ensure_gis(gis: Optional[GIS]) -> GIS:
+    """Helper function ensuring there is a GIS object to work with."""
+    # try to get a GIS object from the current environment
+    if gis is None:
+        gis = active_gis
+
+    # if gis still none, complian
+    if gis is None:
+        raise ValueError(
+            "Please provide a valid GIS object or instantiate a GIS in the active workspace."
+        )
+
+    return gis
 
 
-def example_function(in_path: Union[str, Path]) -> pd.DataFrame:
+@cache
+def get_countries(gis: Optional[GIS]) -> pd.DataFrame:
+    """Get a dataframe of the country ISO2 and heirarchy for constructing urls to introspectively retrieve default reports."""
+
+    # construct the url for getting available countries
+    countries_url = (
+        gis.properties.helperServices.geoenrichment.url + "/Geoenrichment/Countries"
+    )
+
+    # use the gis object to make the request, handles authentication for us
+    res = gis._con.get(countries_url)
+
+    # convert the JSON to a pandas data frame, and only keep the columns we need
+    countries_df = pd.json_normalize(res.get("countries")).loc[:, ["id", "hierarchies"]]
+
+    # get just the id for each of the "hierarchies" we need for constructing urls
+    countries_df["hierarchies"] = countries_df["hierarchies"].apply(
+        lambda h_lst: [h_dict.get("ID") for h_dict in h_lst]
+    )
+
+    # get a row for each of the hierarchies with the country ISO2 code
+    countries_df = countries_df.explode("hierarchies")
+
+    return countries_df
+
+
+def get_standard_infographics(
+    country_iso2: str, gis: Optional[GIS] = None, hierarchy: Optional[str] = None
+) -> pd.DataFrame:
+    """Get a list of standard (default) infographics."""
+    # ensure have a GIS to work with
+    gis = ensure_gis(gis)
+
+    # get the countries dataframe to use
+    countries_df = get_countries(gis)
+
+    # ensure iso2 provided is available
+    if country_iso2 not in list(countries_df.id):
+        raise ValueError(
+            f'The ISO2 country code, "{country_iso2}" you provided does not appear to be available.'
+        )
+
+    # if a hierarchy is not provided, get the available hierarchies for the country
+    if hierarchy is None:
+        hrchy_lst = list(
+            countries_df[countries_df["id"] == country_iso2]["hierarchies"]
+        )
+
+    # if just one hierarchy provided, put into a list for consistency
+    elif isinstance(hierarchy, str):
+        hrchy_lst = [hierarchy]
+
+    # ensure the hierarchies are available for the given country
+    invalid_lst = [
+        h
+        for h in hrchy_lst
+        if h not in list(countries_df[countries_df["id"] == "US"]["hierarchies"])
+    ]
+
+    if len(invalid_lst):
+        raise ValueError(
+            f"The following heirarchies, {invalid_lst}, do not appear to be available for the specified country."
+        )
+
+    # create the dataframe for output
+    out_df = pd.DataFrame(
+        columns=[
+            "reportID",
+            "title",
+            "itemID",
+            "formats",
+            "dataVintage",
+            # 'dataVintageDescription',
+            "countries",
+            "hierarchy",
+            "category",
+        ]
+    )
+
+    # iterate the hierarchies
+    for idx, hrchy in enumerate(hrchy_lst):
+        # construct the url with the counry and hierarchy
+        infographic_url = (
+            gis.properties.helperServices.geoenrichment.url
+            + f"/Geoenrichment/Infographics/Standard/{country_iso2}/{hrchy}"
+        )
+
+        # get the list of default infographics
+        res = gis._con.get(infographic_url, params={"f": "json"})
+
+        # pull out the reports
+        reports = res.get("reports")
+
+        # if there are any infographic reports to work with
+        if reports is not None and len(reports) > 0:
+            # create a data frame of default infographics
+            std_ig_df = pd.json_normalize(reports)
+            std_ig_df.columns = [
+                col.replace("metadata.", "") for col in std_ig_df.columns
+            ]
+            std_ig_df = std_ig_df.loc[
+                :,
+                [
+                    "reportID",
+                    "title",
+                    "itemID",
+                    "formats",
+                    "dataVintage",
+                    # 'dataVintageDescription',
+                    "countries",
+                    "hierarchy",
+                ],
+            ]
+            std_ig_df["category"] = "standard"
+
+            # if the first pass, save to the output
+            if idx == 0:
+                out_df = std_ig_df.copy(deep=True)
+
+            # otherwise, add the results onto what is already bee retrieved
+            else:
+                out_df = pd.concat([out_df, std_ig_df.copy(deep=True)])
+
+    return out_df
+
+
+def get_organization_infographics(gis: Optional[GIS]) -> pd.DataFrame:
+    """Get available infographics for an organization."""
+    # ensure have GIS to work with
+    gis = ensure_gis(gis)
+
+    # get all report templates in the organization
+    itm_lst = gis.content.search("type:Report Template")
+
+    # get those with infographic in the type keywords
+    ig_itm_lst = [
+        itm
+        for itm in itm_lst
+        if any([kw for kw in itm.typeKeywords if "infographic" in kw.lower()])
+    ]
+
+    # reformat the response
+    ig_dict_lst = []
+    for itm in ig_itm_lst:
+        itm_dict = {
+            "title": itm.title,
+            "itemID": itm.id,
+            "itemDescription": itm.description,
+            "countries": itm.properties.get("countries"),
+            "formats": itm.properties.get("formats"),
+            "owner": itm.owner,
+        }
+        ig_dict_lst.append(itm_dict)
+
+    # convert the response into a dataframe
+    cst_ig_df = pd.DataFrame(ig_dict_lst)
+
+    # add custom category
+    cst_ig_df["category"] = "custom"
+
+    return cst_ig_df
+
+
+def create_infographic(
+    study_areas: Union[Geometry, list[Geometry]],
+    gis: GIS,
+    report: str,
+    out_path: Union[str, Path],
+    export_format: str = "pdf",
+):
     """
-    This is an example function, mostly to provide a template for properly
-    structuring a function and docstring for both you, and also for myself,
-    since I *almost always* have to look this up, and it's a *lot* easier
-    for it to be already templated.
+    This is a pretty thin wrapper around the ``arcgis.geoenrichment.create_report``
+    method to make it easier to run reports, specifically infographic reports, using
+    the ArcGIS Python API.
 
     Args:
-        in_path: Required path to something you really care about, or at least
-            want to exploit, a really big word used to simply say, *use*.
+        study_areas: Either a single Geometry or list of Geometry objects.
+        gis: Required instantiated GIS object instance.
+        report: Web GIS Item id or ReportID for one of the standard Infographics.
+        out_path: Path to where the output file will be saved.
+        export_format: String for desired output format. Default is 'pdf'.
 
     Returns:
-        Hypothetically, a Pandas Dataframe. Good luck with that.
+        Path to where output report is stored.
 
-    .. code-block:: python
-
-        from infographics import example_function
-
-        pth = r'C:/path/to/some/table.csv'
-
-        df = example_function(pth)
     """
-    return pd.read_csv(in_path)
+    # ensure list of geometries if only one geometry inputted
+    in_geom = [study_areas] if not isinstance(study_areas, list) else study_areas
 
+    # ensure all inputs are valid geometries
+    assert all([isinstance(geom, Geometry) for geom in in_geom])
 
-class ExampleObject(object):
-    """
-    This is an example object, mostly to provide a template for properly
-    structuring a function and docstring for both you, and also for myself,
-    since I *almost always* have to look this up, and it's a *lot* easier
-    for it to be already templated.
-    """
+    # format geometries as list of dicts so create_report leaves alone
+    in_geom = [{"geometry": json.loads(geom.JSON)} for geom in in_geom]
 
-    def __init__(self, *args, **kwargs):
-        # is not applicable in all cases, but I always have to look it up, so it is here for simplicity's sake
-        super().__init__(*args, **kwargs)
+    # validate export format
+    export_format = export_format.lower()
+    assert export_format in ["xlsx", "pdf", "html"]
 
-    @staticmethod
-    def example_static_function(in_path: Union[str, Path]) -> pd.DataFrame:
-        """
-        This is an example function, mostly to provide a template for properly
-        structuring a function and docstring for both you, and also for myself,
-        since I *almost always* have to look this up, and it's a *lot* easier
-        for it to be already templated.
+    # get the directory and file name from path
+    out_folder = str(out_path.parent)
+    out_name = str(out_path.name)
 
-        Args:
-            in_path: Required path to something you really care about, or at least
-                want to exploit, a really big word used to simply say, *use*.
+    # ensure right extension is used
+    if not out_name.endswith(export_format):
+        out_name = f"{out_name}.{export_format}"
 
-        Returns:
-            Hypothetically, a Pandas Dataframe. Good luck with that.
+    # get the report
+    out_report = create_report(
+        study_areas=in_geom,
+        report=report,
+        export_format=export_format,
+        out_folder=out_folder,
+        out_name=out_name,
+        gis=gis,
+    )
 
-        .. code-block:: python
-
-            from infographics import ExampleObject
-
-            pth = r'C:/path/to/some/table.csv'
-
-            df = ExampleObject.example_function(pth)
-        """
-        return pd.read_csv(in_path)
-
-    @classmethod
-    def example_class_method(cls):
-        """
-        Class methods prove really useful for when you need a method to
-        return an instance of the parent class. Again, I usually  have to
-        search for how to do this, so I also just put it in here.
-
-        Returns:
-            An instance of the class, duh!
-
-        .. code-block:: python
-
-            from from infographics import ExampleObject
-
-            pth = r'C:/path/to/some/table.csv'
-
-            obj_inst = ExampleObject.example_class_method()
-
-            df = obj_inst.example_function(pth)
-        """
-        return cls()
+    return Path(out_report)

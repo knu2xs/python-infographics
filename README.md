@@ -1,4 +1,4 @@
-# infographics
+# Python-Infographics
 
 Finding and running ArcGIS Business Analyst Infographics using Python.
 

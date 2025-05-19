@@ -25,7 +25,7 @@
 
 SETLOCAL
 SET PROJECT_DIR=%cd%
-SET PROJECT_NAME=infographics
+SET PROJECT_NAME=pytyhon-infographics
 SET SUPPORT_LIBRARY = infographics
 SET CONDA_DIR="%~dp0env"
 

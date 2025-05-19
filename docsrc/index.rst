@@ -2,7 +2,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-infographics Documentation
+Python-Infographics Documentation
 =============================================================================================================
 
 This documentation is generated from the template defined in ``./docsrc/source/index.rst``. This location and
@@ -28,7 +28,7 @@ Contents
 .. toctree::
     :maxdepth: 2
 
-    Notebook Template <notebooks/notebook-template>
+    Notebook Template <notebooks/create-infographics>
 
 infographics
 ================================
@@ -37,14 +37,6 @@ Example using the `Sphinx Autodoc`_ extension to document the automatically incl
 project located in ``./src/infographics``.
 
 .. automodule:: infographics
-    :members:
-
-infographics.utils
------------------------------------------------------------
-
-These utilities are included by default to speed up the development process.
-
-.. automodule:: infographics.utils
     :members:
 
 Indices and tables
