@@ -8,7 +8,7 @@ Python-Infographics Documentation
 Python-Infographics is a thin wrapper around the ArcGIS Business Analyst Geoenrichment REST endpoint making
 it easier to discover, run and save infographics. In this (very brief) documentation, there is a succinct
 example Jupyter Notebook and light documentation of the code included in a Python package wrapping the
-Geoenrichment REST endpoint to make discovering available Infographics and runn
+Geoenrichment REST endpoint to make discovering available Infographics and run.
 
 .. note::
 
