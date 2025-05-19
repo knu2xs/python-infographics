@@ -26,7 +26,7 @@ sys.path.insert(0, os.path.abspath('../../src'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'python-infographics'
+project = 'Python-Infographics'
 copyright = '2023, Joel McCune (https://github.com/knu2xs)'
 author = 'Joel McCune (https://github.com/knu2xs)'
 
