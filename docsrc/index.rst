@@ -24,6 +24,6 @@ Contents
     :maxdepth: 2
 
     Notebook Template <notebooks/create-infographics>
-    Python-Infographics API<api.py>
+    Python-Infographics API<api>
 
 .. _Understand Credits in Esri Documentation: https://doc.arcgis.com/en/arcgis-online/administer/credits.htm#ESRI_SECTION1_709121D2C7694DCAB9B8592F36F7A5BA
