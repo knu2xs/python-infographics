@@ -270,11 +270,9 @@ def create_infographic(
 
     # ensure right extension is used
     file_extension = out_path.suffix.lstrip(".")
-    if (
-        not (file_extension == "html" and export_format == "htm")
-        or export_format != file_extension
-    ):
-        out_name = f"{out_name}.{export_format}"
+    if not (file_extension == "htm" and export_format == "html"):
+        if export_format != file_extension:
+            out_name = f"{out_name}.{export_format}"
 
     # get the report
     out_report = create_report(
