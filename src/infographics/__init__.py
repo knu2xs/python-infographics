@@ -28,10 +28,19 @@ def ensure_gis(gis: Optional[GIS]) -> GIS:
     if gis is None:
         gis = active_gis
 
-    # if gis still none, complian
+    # if gis still none, complain
     if gis is None:
         raise ValueError(
             "Please provide a valid GIS object or instantiate a GIS in the active workspace."
+        )
+
+    # make sure geoenrichment is configured for the GIS
+    if (
+        gis.properties.helperServices.geoenrichment is None
+        or gis.properties.helperServices.geoenrichment.url is None
+    ):
+        raise ValueError(
+            f"The provided GIS ({gis.__str__}) does not appear to have a Geoenrichment server configured."
         )
 
     return gis
@@ -39,7 +48,12 @@ def ensure_gis(gis: Optional[GIS]) -> GIS:
 
 @cache
 def get_countries(gis: Optional[GIS]) -> pd.DataFrame:
-    """Get a dataframe of the country ISO2 and heirarchy for constructing urls to introspectively retrieve default reports."""
+    """
+    Get a dataframe of the country ISO2 and hierarchy for constructing urls to introspectively retrieve default reports.
+
+    Args:
+        gis: GIS object instance with Geoenrichemnt services configured.
+    """
 
     # construct the url for getting available countries
     countries_url = (
@@ -66,7 +80,13 @@ def get_countries(gis: Optional[GIS]) -> pd.DataFrame:
 def get_standard_infographics(
     country_iso2: str, gis: Optional[GIS] = None, hierarchy: Optional[str] = None
 ) -> pd.DataFrame:
-    """Get a list of standard (default) infographics."""
+    """
+    Get a list of standard (default) infographics.
+
+    Args:
+        country_iso2: ISO code of the country to get infographics for.
+        gis: GIS object instance with Geoenrichemnt services configured.
+    """
     # ensure have a GIS to work with
     gis = ensure_gis(gis)
 
@@ -164,7 +184,12 @@ def get_standard_infographics(
 
 
 def get_organization_infographics(gis: Optional[GIS]) -> pd.DataFrame:
-    """Get available infographics for an organization."""
+    """
+    Get available custom Infographics for an organization.
+
+    Args:
+        gis: GIS object instance with Geoenrichemnt services configured.
+    """
     # ensure have GIS to work with
     gis = ensure_gis(gis)
 
@@ -202,10 +227,10 @@ def get_organization_infographics(gis: Optional[GIS]) -> pd.DataFrame:
 
 def create_infographic(
     study_areas: Union[Geometry, list[Geometry]],
-    gis: GIS,
     infographic_id: str,
     out_path: Union[str, Path],
-    export_format: str = "pdf",
+    export_format: Optional[str] = "pdf",
+    gis: Optional[GIS] = None,
 ):
     """
     This is a pretty thin wrapper around the ``arcgis.geoenrichment.create_report``
@@ -214,15 +239,18 @@ def create_infographic(
 
     Args:
         study_areas: Either a single Geometry or list of Geometry objects.
-        gis: Required instantiated GIS object instance.
         infographic_id: Web GIS Item id or ReportID for one of the standard Infographics.
         out_path: Path to where the output file will be saved.
         export_format: String for desired output format. Default is 'pdf'.
+        gis: GIS object instance with Geoenrichemnt services configured.
 
     Returns:
         Path to where output report is stored.
 
     """
+    # make sure gis has what we need
+    gis = ensure_gis(gis)
+
     # ensure list of geometries if only one geometry inputted
     in_geom = [study_areas] if not isinstance(study_areas, list) else study_areas
 
@@ -241,7 +269,11 @@ def create_infographic(
     out_name = str(out_path.name)
 
     # ensure right extension is used
-    if not out_name.endswith(export_format):
+    file_extension = out_path.suffix.lstrip(".")
+    if (
+        not (file_extension == "html" and export_format == "htm")
+        or export_format != file_extension
+    ):
         out_name = f"{out_name}.{export_format}"
 
     # get the report
